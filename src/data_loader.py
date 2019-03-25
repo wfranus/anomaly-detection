@@ -2,7 +2,8 @@ import os
 import numpy as np
 
 
-def load_video_data(abnorm_path, norm_path, batch_size=60, n_seg=32, feat_dim=4096):
+def load_video_data(abnorm_path, norm_path, batch_size=60,
+                    n_seg=32, feat_dim=4096, verbose=0):
     """Load features of abnormal and normal videos from files."""
     assert batch_size % 2 == 0, 'Batch size must be multiple of 2'
     n_exp = batch_size // 2  # Number of abnormal and normal videos
@@ -22,7 +23,8 @@ def load_video_data(abnorm_path, norm_path, batch_size=60, n_seg=32, feat_dim=40
     batch_videos = [os.path.join(abnorm_path, abnorm_videos[id]) for id in abnorm_indices]
     batch_videos += [os.path.join(norm_path, norm_videos[id]) for id in norm_indices]
 
-    print("Loading features...")
+    if verbose:
+        print("Loading features...")
 
     # TODO: maybe store C3D in binary format rather than textual for easier loading?
     def load_features_from_file(file_path) -> np.ndarray:
@@ -51,7 +53,8 @@ def load_video_data(abnorm_path, norm_path, batch_size=60, n_seg=32, feat_dim=40
         else:
             batch_features = np.vstack((batch_features, vid_features))
 
-    print("Features loaded")
+    if verbose:
+        print("Features loaded")
 
     # segments of abnormal videos are labeled 0
     # while segments of normal videos are labeled 1

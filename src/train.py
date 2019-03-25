@@ -7,7 +7,7 @@ from scipy.io import savemat
 
 from src.model import model, save_model
 from src.data_loader import load_video_data
-from src.loss import custom_objective
+from src.loss import custom_loss
 
 
 if __name__ == '__main__':
@@ -30,7 +30,9 @@ if __name__ == '__main__':
 
     mil_model = model(input_dim=args.dim_features)
     optimizer = Adagrad(lr=args.learning_rate, epsilon=1e-08)
-    mil_model.compile(optimizer=optimizer, loss=custom_objective)
+    mil_model.compile(optimizer=optimizer,
+                      loss=custom_loss(n_bags=args.batch_size,
+                                       n_seg=args.segments))
 
     loss_graph = []
     time_before = datetime.now()
