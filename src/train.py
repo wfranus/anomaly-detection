@@ -1,7 +1,11 @@
+import numpy as np
+# np.random.seed(42)
+# from tensorflow import set_random_seed
+# set_random_seed(42)
+
+import os
 from argparse import ArgumentParser
 from datetime import datetime
-import numpy as np
-import os
 from keras.optimizers import Adagrad
 from scipy.io import savemat
 
@@ -16,13 +20,13 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--batch_size', type=int, default=60)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.01)
     parser.add_argument('-s', '--save_path', default='pretrained')
-    parser.add_argument('-d', '--train_data', default='data')
     parser.add_argument('-ns', '--segments', type=int, default=32)
     parser.add_argument('-df', '--dim_features', type=int, default=4096)
+    parser.add_argument('data', default='data', help='train data directory')
     args = parser.parse_args()
 
-    abnorm_path = os.path.join(args.train_data, 'abnorm')
-    norm_path = os.path.join(args.train_data, 'norm')
+    abnorm_path = os.path.join(args.data, 'abnorm')
+    norm_path = os.path.join(args.data, 'norm')
     assert os.path.exists(abnorm_path) and os.path.exists(norm_path)
     os.makedirs(args.save_path, exist_ok=True)
     model_path = os.path.join(args.save_path, 'model.json')

@@ -14,9 +14,6 @@ def load_video_data(abnorm_path, norm_path, batch_size=60,
     assert n_exp <= len(abnorm_videos)
     assert n_exp <= len(norm_videos)
 
-    # n_abnorm = 810  # Total number of abnormal videos in Training Dataset.
-    # n_norm = 800  # Total number of Normal videos in Training Dataset.
-
     abnorm_indices = np.random.choice(len(abnorm_videos), n_exp, replace=False)
     norm_indices = np.random.choice(len(norm_videos), n_exp, replace=False)
 
@@ -26,28 +23,10 @@ def load_video_data(abnorm_path, norm_path, batch_size=60,
     if verbose:
         print("Loading features...")
 
-    # TODO: maybe store C3D in binary format rather than textual for easier loading?
-    def load_features_from_file(file_path) -> np.ndarray:
-        with open(file_path, "r") as f:
-            words = f.read().split()
-
-        num_feat = len(words) / feat_dim
-        assert num_feat == n_seg
-
-        vid_features = []
-        for feat in range(n_seg):
-            feat_row = np.float32(words[feat * feat_dim:feat * feat_dim + feat_dim])
-            if feat == 0:
-                vid_features = feat_row
-            else:
-                vid_features = np.vstack((vid_features, feat_row))
-
-        return vid_features
-
     batch_features = []  # To store C3D features of a batch
 
     for i, video_path in enumerate(batch_videos):
-        vid_features = load_features_from_file(video_path)
+        vid_features = load_features_from_file(video_path, n_seg, feat_dim)
         if i == 0:
             batch_features = vid_features
         else:
@@ -62,3 +41,31 @@ def load_video_data(abnorm_path, norm_path, batch_size=60,
     targets[n_exp * n_seg:] = 1
 
     return batch_features, targets
+
+
+def load_features_from_file(file_path: str, n_seg: int, feat_dim: int=4096) -> np.ndarray:
+    """Load 2D array of features from file.
+
+    Args:
+        file_path: Path to file
+        n_seg: number of segments (# rows)
+        feat_dim: number of features for each segment (# cols)
+
+    Returns:
+        A numpy array of shape (n_seg, feat_dim) and type float32.
+    """
+    with open(file_path, "r") as f:
+        words = f.read().split()
+
+    num_feat = len(words) / feat_dim
+    assert num_feat == n_seg
+
+    vid_features = []
+    for feat in range(n_seg):
+        feat_row = np.float32(words[feat * feat_dim:feat * feat_dim + feat_dim])
+        if feat == 0:
+            vid_features = feat_row
+        else:
+            vid_features = np.vstack((vid_features, feat_row))
+
+    return vid_features
