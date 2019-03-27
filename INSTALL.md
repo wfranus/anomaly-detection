@@ -1,5 +1,5 @@
-# C3D Feature extraction
-Steps to install C3D on Ubuntu and use pre-trained models to extract video features.
+# C3D v1.0 installation and video feature extraction
+Steps to install C3D v1.0 on Ubuntu and use pre-trained models to extract video features.
 
 ## Installation
 >Tested on: Ubuntu 18.04, GeForce 930M card, nvidia-driver 418.43, CUDA Toolkit 9.2, **C3D v1.0**
@@ -18,31 +18,35 @@ Detailed installation steps (also for MacOS) can be found
     * run the runfile `sudo sh cuda_9.2.88_396.26_linux.run`
         * **answer 'no' when asked for installing nvidia driver!!!** and 'yes' for other questions
     * install cuBLAS patch `sudo sh cuda_9.2.148.1_linux.run`
+    * modify environmental variables, eg. by appending the following lines to `~/.bashrc` file:
+        ```bash
+        export PATH=$PATH:/usr/local/cuda-9.2/bin
+        export CUDADIR=/usr/local/cuda-9.2
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-9.2/lib64
+        ```
+        after that, run `source ~/.bashrc` to reload current environment
     * (optional) verify your installation by performing steps 6 and 7 from [here](https://www.pugetsystems.com/labs/hpc/How-to-install-CUDA-9-2-on-Ubuntu-18-04-1184/)
-* Install ATLAS: `sudo apt-get install libatlas-base-dev`
-
 * Install Additional dependencies:
-`sudo apt-get install libprotobuf-dev libleveldb-dev libsnappy-dev libopencv-dev libboost-all-dev libhdf5-serial-dev`
+`sudo apt-get install libatlas-base-dev libprotobuf-dev libleveldb-dev libsnappy-dev libopencv-dev libboost-all-dev libhdf5-serial-dev`
 
 * Install Google logging library
-```bash
-curl -OL https://github.com/google/glog/archive/v0.4.0.zip
-unzip v0.4.0.zip && cd glog-0.4.0
-./autogen.sh && ./configure && make && sudo make install  # use make -j2 for parallel
-cd .. && rm -f GLOG_ZIP && rm -r glog-0.4.0
-```
+    ```bash
+    curl -OL https://github.com/google/glog/archive/v0.4.0.zip
+    unzip v0.4.0.zip && cd glog-0.4.0
+    ./autogen.sh && ./configure && make && sudo make install  # use make -j2 for parallel
+    cd .. && rm -f GLOG_ZIP && rm -r glog-0.4.0
+    ```
 
 * Install Protobuf compiler: `sudo apt install protobuf-compiler`.
 
-If C3D compilation fails because of protoc, try installing protoc like this:
-```bash
-PROTOC_ZIP=protoc-3.3.0-linux-x86_64.zip
-curl -OL https://github.com/google/protobuf/releases/download/v3.3.0/$PROTOC_ZIP
-sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-rm -f $PROTOC_ZIP
-
-```
-Instruction for MacOS [here](http://google.github.io/proto-lens/installing-protoc.html)
+    If C3D compilation fails because of protoc, try installing protoc like this:
+    ```bash
+    PROTOC_ZIP=protoc-3.3.0-linux-x86_64.zip
+    curl -OL https://github.com/google/protobuf/releases/download/v3.3.0/$PROTOC_ZIP
+    sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+    rm -f $PROTOC_ZIP
+    ```
+    Instructions for MacOS [here](http://google.github.io/proto-lens/installing-protoc.html)
 
 #### Install C3D
 Download C3D code from github: https://github.com/facebook/C3D
@@ -79,9 +83,10 @@ make runtest
 ```
 If some targets fail to compile (some examples and tests), try to exclude (or delete) related .cpp files from
 compilation process.
+
 Eg. `mv examples/mnist/convert_mnist_data.cpp examples/mnist/convert_mnist_data.cpp_turnoff`
 
 ## Extract C3D features
-Follow [this](https://docs.google.com/document/d/1-QqZ3JHd76JfimY4QKqOojcEaf5g3JS0lNh-FHTxLag/edit) doc with instructions.
+Follow [this doc](https://docs.google.com/document/d/1-QqZ3JHd76JfimY4QKqOojcEaf5g3JS0lNh-FHTxLag/edit) with instructions.
 
 > check http://vra.github.io/2016/03/03/c3d-use/
