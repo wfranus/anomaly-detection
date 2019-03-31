@@ -81,21 +81,21 @@ def count_frames(path: str, accurate: bool = False) -> int:
     return total
 
 
-def run_C3D_extraction(caffe_root, feature_prototxt: str,
+def run_C3D_extraction(c3d_root, feature_prototxt: str,
                        trained_model:str, ofile: str,
                        gpu_id: int = 0, batch_size: int = 50,
                        feature_layer: str = 'fc6-1', ) -> int:
-    """Extract C3D features by running caffe binary"""
+    """Extract C3D features by running extract_image_features.bin binary"""
 
     almost_infinite_num = 9999999
 
     extract_bin = os.path.join(
-        caffe_root,
+        c3d_root,
         "build/tools/extract_image_features.bin"
     )
 
     if not os.path.isfile(extract_bin):
-        logger.error("Build facebook/C3D first, or make sure caffe_dir is "
+        logger.error("Build facebook/C3D first, or make sure c3d_root is "
                      "correct")
         sys.exit(-9)
 
@@ -122,7 +122,8 @@ def create_input_prototxt(input_dir: str,
                           out_filename: str = 'input.txt',
                           start_frame: int = 0,
                           stride: int = 16,
-                          max_clips: int = None):
+                          max_clips: int = None,
+                          force_accurate_frames: bool = True):
     """Create input prototxt file for C3D feature extractor.
 
     This text file defines input video clips for C3D feature extractor.
@@ -152,7 +153,7 @@ def create_input_prototxt(input_dir: str,
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, out_filename), 'w') as f:
         for file in input_files:
-            n_frames = count_frames(file, accurate=True)
+            n_frames = count_frames(file, accurate=force_accurate_frames)
             logger.debug(f'frames: {n_frames} - {file}')
 
             if start_frame > n_frames:
@@ -161,11 +162,13 @@ def create_input_prototxt(input_dir: str,
 
             n_clips = int((n_frames-start_frame)/stride)
             if max_clips is None or max_clips <= 0 or max_clips > n_clips:
-                max_clips = n_clips
+                _max_clips = n_clips
+            else:
+                _max_clips = max_clips
 
             s_frame = start_frame
             dummy_label = 0
-            for _ in range(max_clips):
+            for _ in range(_max_clips):
                 # write line describing single clip consisting of stride frames,
                 # syntax is: <path_to_file> <starting_frame_indexed_from_0> <label>
                 # int label is not used during feature extraction, but must be present
@@ -216,10 +219,25 @@ def create_output_prefix_file(input_prototxt: str,
             os.makedirs(os.path.join(out_features_dir, file_name), exist_ok=True)
 
 
-def create_network_prototxt(out_file: str, caffe_root: str, src_file: str,
+def create_network_prototxt(out_file: str, c3d_root: str, src_file: str,
                             mean_file: str = None, batch_size: int = 50):
+    """Create prototxt file with C3D network configuration.
+
+    Default configuration of the C3D pretrained on sport1m dataset will be used.
+    Only batch size and paths to input config files can be modified.
+
+    Args:
+        out_file:   path to the output file
+        c3d_root:   path to the root of C3D v1.0 project
+        src_file:   path to the existing file with description of input data
+        mean_file:  if set, path to custom binaryproto file describing the model.
+                    By default an appropriate file from C3D examples will be taken.
+        batch_size: batch size of the model. Batch size of 50 should be fine
+                    for 6GB VRAM. Reduce or increase this parameter depend on
+                    your GPU.
+    """
     c3d_feat_extr_dir = os.path.join(
-        caffe_root,
+        c3d_root,
         'examples',
         'c3d_feature_extraction',
     )
@@ -341,13 +359,21 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
 def main():
     parser = ArgumentParser()
     parser.add_argument('-b', '--batch_size', type=int, default=50)
-    parser.add_argument('-gpu', '--gpu', type=int, default=0)
-    parser.add_argument('model', default='pretrained/conv3d_deepnetA_sport1m_iter_1900000')
-    parser.add_argument('video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
-    parser.add_argument('input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Test_small.txt')
-    parser.add_argument('out_c3d_feat', default='out/c3d')
-    parser.add_argument('out_dir', default='out/converted')
-    parser.add_argument('-c3d_root', default='C3D-master/C3D-v1.0')
+    parser.add_argument('-gpu', '--gpu', type=int, default=0, help="id of GPU to use")
+    parser.add_argument('--fast', action='store_true', default=False,
+                        help='If true, try to read frame count from video '
+                             'metadata. If false or such information is not '
+                             'provided in metadata, count video frames manually '
+                             'which always gives accurate result but is slow.')
+    parser.add_argument('--model', default='pretrained/conv3d_deepnetA_sport1m_iter_1900000')
+    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
+    parser.add_argument('--input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Train.txt')
+    parser.add_argument('--out_c3d', default='data/c3d/train',
+                        help='output directory for C3D features')
+    parser.add_argument('--out_mil', default='data/mil/train',
+                        help='output directory for MIL model input data '
+                             '(segmented C3D features)')
+    parser.add_argument('--c3d_root', default='C3D-master/C3D-v1.0')
     args = parser.parse_args()
 
     # data
@@ -365,17 +391,18 @@ def main():
         input_dir=args.video_dir,
         input_files=test_files,
         out_dir=prototxt_dir,
-        out_filename=input_config_file
+        out_filename=input_config_file,
+        force_accurate_frames=(not args.fast)
     )
     create_output_prefix_file(
         input_prototxt=prototxt_dir,
         out_dir=prototxt_dir,
         out_filename=output_config_file,
-        out_features_dir=args.out_c3d_feat
+        out_features_dir=args.out_c3d
     )
     create_network_prototxt(
         out_file=os.path.join(prototxt_dir, feature_extraction_config),
-        caffe_root=args.c3d_root,
+        c3d_root=args.c3d_root,
         src_file=os.path.join(prototxt_dir, input_config_file),
         mean_file=None,
         batch_size=args.batch_size
@@ -393,11 +420,11 @@ def main():
     if ret_code == 0:
         logger.info("Feature extraction completed!")
         logger.info("Converting extracted features to MIL data format.")
-        feat_dirs = [f.path for f in os.scandir(args.out_c3d_feat) if f.is_dir()]
+        feat_dirs = [f.path for f in os.scandir(args.out_c3d) if f.is_dir()]
         feat_dirs = sorted(feat_dirs)
 
         for dir in feat_dirs:
-            split_c3d_features_to_segments(feat_dir=dir, out_dir=args.out_dir)
+            split_c3d_features_to_segments(feat_dir=dir, out_dir=args.out_mil)
     else:
         logger.error("Feature extraction failed!")
 
