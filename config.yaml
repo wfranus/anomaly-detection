@@ -1,0 +1,6 @@
+C3D:
+  root: /home/Downloads/C3D-master/C3D-v1.0
+  model: ./pretrained/conv3d_deepnetA_sport1m_iter_1900000
+  batch_size: 8
+
+gpu: 0

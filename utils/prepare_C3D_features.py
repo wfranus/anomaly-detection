@@ -8,13 +8,17 @@ https://github.com/facebook/C3D/blob/master/C3D-v1.0/examples/c3d_feature_extrac
 import array
 import cv2
 import logging
+import math
 import os
 import re
 import subprocess
 import sys
 import numpy as np
-from argparse import ArgumentParser
-from typing import Sequence
+import yaml
+from argparse import ArgumentParser, Namespace
+from types import SimpleNamespace
+from typing import Sequence, Tuple
+from yaml import Loader
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -41,8 +45,8 @@ def check_trained_model(trained_model):
             sys.exit(-10)
 
 
-def count_frames(path: str, accurate: bool = False) -> int:
-    """Count number of frames in video file.
+def count_frames(path: str, accurate: bool = False) -> Tuple[int, float]:
+    """Return number of frames in video and frames per second rate.
 
     Args:
         path:     path to the video file
@@ -52,7 +56,7 @@ def count_frames(path: str, accurate: bool = False) -> int:
                   can be inaccurate or missing.
 
     Return:
-        A number of frames in video file
+        A tuple (number of frames in video file, frames per second)
     """
     video = cv2.VideoCapture(path)
     if not video.isOpened():
@@ -67,18 +71,26 @@ def count_frames(path: str, accurate: bool = False) -> int:
             count += 1
         return count
 
+    def is_cv2():
+        return cv2.__version__.startswith('2.')
+
     if accurate:
         total = manual_count(video)
     else:
         try:
-            if cv2.__version__.startswith('2.'):
+            if is_cv2():
                 total = int(video.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
             else:
                 total = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         except:
             total = manual_count(video)
 
-    return total
+    if is_cv2():
+        fps = float(video.get(cv2.cv.CV_CAP_PROP_FPS))
+    else:
+        fps = float(video.get(cv2.CAP_PROP_FPS))
+
+    return total, fps
 
 
 def run_C3D_extraction(c3d_root, feature_prototxt: str,
@@ -86,9 +98,6 @@ def run_C3D_extraction(c3d_root, feature_prototxt: str,
                        gpu_id: int = 0, batch_size: int = 50,
                        feature_layer: str = 'fc6-1', ) -> int:
     """Extract C3D features by running extract_image_features.bin binary"""
-
-    almost_infinite_num = 9999999
-
     extract_bin = os.path.join(
         c3d_root,
         "build/tools/extract_image_features.bin"
@@ -99,13 +108,20 @@ def run_C3D_extraction(c3d_root, feature_prototxt: str,
                      "correct")
         sys.exit(-9)
 
+    # compute number of mini batches based on the number of clips
+    with open(ofile, 'r') as f:
+        clip_count = 0
+        for _ in f:
+            clip_count += 1
+    n_batches = math.ceil(clip_count / batch_size)
+
     feature_extraction_cmd = [
         extract_bin,
         feature_prototxt,
         trained_model,
         str(gpu_id),
         str(batch_size),
-        str(almost_infinite_num),
+        str(n_batches),
         ofile,
         feature_layer,
     ]
@@ -153,7 +169,7 @@ def create_input_prototxt(input_dir: str,
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, out_filename), 'w') as f:
         for file in input_files:
-            n_frames = count_frames(file, accurate=force_accurate_frames)
+            n_frames, _ = count_frames(file, accurate=force_accurate_frames)
             logger.debug(f'frames: {n_frames} - {file}')
 
             if start_frame > n_frames:
@@ -319,22 +335,22 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
     for i, file in enumerate(files):
         all_features[i, :] = load_array_from_blob(file, feat_dim)
 
-    # split_ranges contains indices of all_features indicating split points
-    # for n_seg segments. Split points are computed on 1-based indexing,
+    # breakpoints contains indices of all_features indicating breakpoints
+    # for n_seg segments. Breakpoints are computed on 1-based indexing,
     # following matlab implementation of this function.
-    split_ranges = np.linspace(1, all_features.shape[0], n_seg + 1)
+    breakpoints = np.linspace(1, all_features.shape[0], n_seg + 1)
     # np.rint implementation is inconsistent with matlab round function!
-    # split_ranges = np.rint(split_ranges).astype('int').tolist()
-    split_ranges = np.floor(split_ranges + 0.5).astype('int').tolist()
+    # breakpoints = np.rint(breakpoints).astype('int').tolist()
+    breakpoints = np.floor(breakpoints + 0.5).astype('int').tolist()
     # convert from 1-based to 0-based indexing
-    split_ranges = np.subtract(split_ranges, 1)
+    breakpoints = np.subtract(breakpoints, 1)
 
     seg_features = np.zeros((n_seg, feat_dim), dtype='float32')
-    for i in range(len(split_ranges) - 1):
+    for i in range(len(breakpoints) - 1):
         # ss - starting index, ee - end (after last) index
         # it matlab we had to subtract 1 from ee, because end index
         # points to last element (inclusively) in matlab
-        ss, ee = split_ranges[i], split_ranges[i+1]
+        ss, ee = breakpoints[i], breakpoints[i+1]
 
         if ee <= ss:
             tmp_vec = all_features[ss, :]
@@ -356,27 +372,18 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
     return seg_features
 
 
-def main():
-    parser = ArgumentParser()
-    parser.add_argument('-b', '--batch_size', type=int, default=50)
-    parser.add_argument('-gpu', '--gpu', type=int, default=0, help="id of GPU to use")
-    parser.add_argument('--fast', action='store_true', default=False,
-                        help='If true, try to read frame count from video '
-                             'metadata. If false or such information is not '
-                             'provided in metadata, count video frames manually '
-                             'which always gives accurate result but is slow.')
-    parser.add_argument('--model', default='pretrained/conv3d_deepnetA_sport1m_iter_1900000')
-    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
-    parser.add_argument('--input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Train.txt')
-    parser.add_argument('--out_c3d', default='data/c3d/train',
-                        help='output directory for C3D features')
-    parser.add_argument('--out_mil', default='data/mil/train',
-                        help='output directory for MIL model input data '
-                             '(segmented C3D features)')
-    parser.add_argument('--c3d_root', default='C3D-master/C3D-v1.0')
-    args = parser.parse_args()
+def prepare_C3D_features(args):
+    """Extracts C3D features from videos and convert these features
+    into desired number of new features to match MIL input data format
 
-    # data
+    Args:
+        args: namespace or dictionary-like object with arguments
+              (see main function for argument description)
+    """
+    if not (isinstance(args, SimpleNamespace) or isinstance(args, Namespace)):
+        args = SimpleNamespace(**args)
+
+    # read user input file
     with open(args.input_file, 'r') as f:
         test_files = f.read().splitlines()
 
@@ -424,9 +431,54 @@ def main():
         feat_dirs = sorted(feat_dirs)
 
         for dir in feat_dirs:
-            split_c3d_features_to_segments(feat_dir=dir, out_dir=args.out_mil)
+            split_c3d_features_to_segments(feat_dir=dir, out_dir=args.out_mil,
+                                           n_seg=args.num_seg)
     else:
         logger.error("Feature extraction failed!")
+
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument('--num_seg', type=int, default=32)
+    parser.add_argument('--fast', action='store_true', default=False,
+                        help='If true, try to read frame count from video '
+                             'metadata. If false or such information is not '
+                             'provided in metadata, count video frames manually '
+                             'which always gives accurate result but is slow.')
+    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
+    parser.add_argument('--input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Test.txt')
+    parser.add_argument('--out_c3d', default='data/c3d/test',
+                        help='output directory for C3D features')
+    parser.add_argument('--out_mil', default='data/mil/test',
+                        help='output directory for MIL model input data '
+                             '(segmented C3D features)')
+    args = parser.parse_args()
+
+    # check provided paths and download model if necessary
+    if not os.path.isdir(args.video_dir):
+        logger.error(f'Video directory doesn\'t exist: {args.video_dir}')
+        sys.exit()
+    if not os.path.isfile(args.input_file):
+        logger.error(f'Input file doesn\'t exist: {args.input_file}')
+        sys.exit()
+
+    # load C3D model configuration from config.yaml
+    config_path = os.path.join(os.path.dirname(__file__),
+                               os.pardir,
+                               'config.yaml')
+    with open(config_path, 'r') as ymlfile:
+        cfg = yaml.load(ymlfile, Loader)
+
+    args = Namespace(**vars(args),
+                     model=cfg['C3D']['model'],
+                     c3d_root=cfg['C3D']['root'],
+                     batch_size=cfg['C3D']['batch_size'],
+                     gpu=cfg['gpu'])
+
+    check_trained_model(args.model)
+
+    # run pipeline
+    prepare_C3D_features(args)
 
 
 if __name__ == '__main__':
