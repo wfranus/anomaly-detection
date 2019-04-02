@@ -83,6 +83,7 @@ def count_frames(path: str, accurate: bool = False) -> Tuple[int, float]:
             else:
                 total = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         except:
+            logger.debug(f'missing frame count in video metadata: {path}')
             total = manual_count(video)
 
     if is_cv2():

@@ -30,16 +30,13 @@ def load_model(json_path):
 def load_weights(model, weight_path):
     dict2 = loadmat(weight_path)
     dict = conv_dict(dict2)
-    i = 0
-    for layer in model.layers:
+    for i, layer in enumerate(model.layers):
         weights = dict[str(i)]
         layer.set_weights(weights)
-        i += 1
     return model
 
 
 def conv_dict(dict2):
-    i = 0
     dict = {}
     for i in range(len(dict2)):
         if str(i) in dict2:
@@ -49,7 +46,7 @@ def conv_dict(dict2):
                 weights = dict2[str(i)][0]
                 weights2 = []
                 for weight in weights:
-                    if weight.shape in [(1, x) for x in range(0, 5000)]:
+                    if weight.shape[0] == 1:
                         weights2.append(weight[0])
                     else:
                         weights2.append(weight)
