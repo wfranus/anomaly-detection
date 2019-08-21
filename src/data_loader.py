@@ -6,7 +6,7 @@ def load_video_data(abnorm_path, norm_path, batch_size=60,
                     n_seg=32, feat_dim=4096, verbose=0):
     """Load features of abnormal and normal videos from files."""
     assert batch_size % 2 == 0, 'Batch size must be multiple of 2'
-    n_exp = batch_size // 2  # Number of abnormal and normal videos
+    n_exp = batch_size // 2  # Number of abnormal and normal videos in batch
 
     abnorm_videos = sorted(os.listdir(abnorm_path))
     norm_videos = sorted(os.listdir(norm_path))
@@ -43,7 +43,7 @@ def load_video_data(abnorm_path, norm_path, batch_size=60,
     return batch_features, targets
 
 
-def load_features_from_file(file_path: str, n_seg: int, feat_dim: int=4096) -> np.ndarray:
+def load_features_from_file(file_path: str, n_seg: int, feat_dim: int = 4096) -> np.ndarray:
     """Load 2D array of features from file.
 
     Args:

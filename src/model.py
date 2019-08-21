@@ -6,7 +6,8 @@ from scipy.io import loadmat, savemat
 import numpy as np
 
 
-def model(input_dim: int=4096) -> Sequential:
+def model(input_dim: int = 4096) -> Sequential:
+    """Create Keras model"""
     model = Sequential()
     model.add(Dense(512, input_dim=input_dim, activation='relu',
                     kernel_initializer='glorot_normal',
@@ -23,11 +24,13 @@ def model(input_dim: int=4096) -> Sequential:
 
 
 def load_model(json_path):
+    """Load model (without weights) from json file."""
     model = model_from_json(open(json_path).read())
     return model
 
 
 def load_weights(model, weight_path):
+    """Load weights from matlab files and assign them to model layers."""
     dict2 = loadmat(weight_path)
     dict = conv_dict(dict2)
     for i, layer in enumerate(model.layers):
@@ -37,6 +40,7 @@ def load_weights(model, weight_path):
 
 
 def conv_dict(dict2):
+    """Convert dictionary from Matlab-like style to Python style."""
     dict = {}
     for i in range(len(dict2)):
         if str(i) in dict2:
@@ -54,14 +58,17 @@ def conv_dict(dict2):
     return dict
 
 
-def save_model(model, json_path, weight_path):
+def save_model(model: Sequential, json_path: str, weights_file_path: str):
+    """Save given model and its weights to files.
+    Weights are saved in Matlab format.
+    All parent directories within `json_path` and `weights_file_path`
+    must exist.
+    """
     with open(json_path, 'w') as f:
         f.write(model.to_json())
 
     dict = {}
     for i, layer in enumerate(model.layers):
-        weights = layer.get_weights()
-        my_list = np.zeros(len(weights), dtype=np.object)
-        my_list[:] = weights
-        dict[str(i)] = my_list
-    savemat(weight_path, dict)
+        dict[str(i)] = layer.get_weights()
+
+    savemat(weights_file_path, dict)

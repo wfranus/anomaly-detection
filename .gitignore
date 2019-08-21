@@ -1,3 +1,8 @@
 .idea/
 __pycache__/
 *.py[cod]
+data/UCF-Anomaly-Detection-Dataset/**
+data/c3d/**
+data/mil/**
+results/**
+results_mat/**

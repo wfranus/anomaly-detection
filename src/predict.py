@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     assert os.path.exists(args.model_path)
     mil_model = load_model(os.path.join(args.model_path, 'model.json'))
-    load_weights(mil_model, os.path.join(args.model_path, 'weights.mat'))
+    load_weights(mil_model, os.path.join(args.model_path, 'weights_L1L2.mat'))
 
     if len(test_files):
         os.makedirs(args.output_path, exist_ok=True)
