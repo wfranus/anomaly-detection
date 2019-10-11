@@ -5,7 +5,7 @@ from keras.models import Sequential
 from numpy.testing import assert_raises, assert_array_equal
 from scipy.io import loadmat
 
-from src.model import model, load_model, save_model, load_weights, conv_dict
+from src.model import create_model, load_model, save_model, load_weights, conv_dict
 
 
 MODEL_PATH = "tests/fixtures/model.json"
@@ -13,7 +13,7 @@ WEIGHTS_PATH = "pretrained/weights_L1L2.mat"
 
 
 def test_create_model():
-    keras_model = model()
+    keras_model = create_model()
     assert isinstance(keras_model, Sequential)
 
 
@@ -25,7 +25,7 @@ def test_load_model():
 @pytest.mark.skipif(not os.path.isfile(WEIGHTS_PATH),
                     reason='File with weights not found.')
 def test_load_weights():
-    keras_model = model()
+    keras_model = create_model()
     weights_before = keras_model.get_weights()
 
     load_weights(keras_model, WEIGHTS_PATH)
@@ -42,7 +42,7 @@ def test_load_weights():
 
 
 def test_save_weights():
-    keras_model = model()
+    keras_model = create_model()
 
     save_model(keras_model, "/tmp/model.json", "/tmp/weights.mat")
 

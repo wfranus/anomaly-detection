@@ -13,3 +13,7 @@ def cfg():
         cfg = yaml.load(ymlfile, Loader)
 
     return cfg
+
+
+# ignore test_loss_impl.py by default since it requires theano to be installed
+collect_ignore = ['test_loss_impl.py']

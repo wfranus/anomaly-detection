@@ -6,12 +6,21 @@ from src.model import load_model, load_weights
 
 
 if __name__ == '__main__':
+    """Predict anomaly scores for video segments.
+
+    It uses the pretrained MIL model created by train.py.
+    """
     parser = ArgumentParser()
-    parser.add_argument('-m', '--model_path', default='pretrained')
-    parser.add_argument('-o', '--output_path', default='results')
-    parser.add_argument('-ns', '--segments', type=int, default=32)
-    parser.add_argument('-df', '--dim_features', type=int, default=4096)
-    parser.add_argument('data', default='data', help='test data directory')
+    parser.add_argument('-m', '--model_path', default='pretrained',
+                        help='Path to the saved MIL model.')
+    parser.add_argument('-o', '--output_path', default='results',
+                        help='Where to store predictions.')
+    parser.add_argument('-ns', '--segments', type=int, default=32,
+                        help='Number of segments in MIL. Must be the same '
+                             'as during training.')
+    parser.add_argument('-df', '--dim_features', type=int, default=4096,
+                        help='Dimensionality of video features.')
+    parser.add_argument('data', default='data', help='Test data directory.')
 
     args = parser.parse_args()
 

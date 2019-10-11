@@ -3,11 +3,15 @@ from keras.models import model_from_json
 from keras.layers import Dense, Dropout
 from keras.regularizers import l2
 from scipy.io import loadmat, savemat
-import numpy as np
 
 
-def model(input_dim: int = 4096) -> Sequential:
-    """Create Keras model"""
+def create_model(input_dim: int = 4096) -> Sequential:
+    """Create Keras model used during MIL learning.
+
+    It is a 3-layer perceptron with 512, 32 and 1 neurons accordingly,
+    regularized with Dropout layers and L2 regularizers after each
+    hidden layer.
+    """
     model = Sequential()
     model.add(Dense(512, input_dim=input_dim, activation='relu',
                     kernel_initializer='glorot_normal',

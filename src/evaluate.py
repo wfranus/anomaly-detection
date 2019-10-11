@@ -55,7 +55,7 @@ def evaluate():
     pred_file_paths = [os.path.join(args.scores, f) for f in pred_file_names]
 
     # load annotations
-    annotations = pd.read_csv(args.temp_ann, '\s+', header=None,
+    annotations = pd.read_csv(args.temp_ann, r'\s+', header=None,
                               names=['name', 'class', 'sf1', 'ef1', 'sf2', 'ef2'])
 
     # predictions (scores) and ground truth for all frames from all videos
@@ -172,7 +172,7 @@ def evaluate():
         plt.show()
 
         plt.savefig(os.path.join(args.out, "roc.png"))
-        
+
 
 if __name__ == '__main__':
     evaluate()
