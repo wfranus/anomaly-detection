@@ -169,9 +169,8 @@ def evaluate():
         plt.ylabel('True Positive Rate')
         plt.title('ROC')
         plt.legend(loc="lower right")
-        plt.show()
-
         plt.savefig(os.path.join(args.out, "roc.png"))
+        plt.show()
 
 
 if __name__ == '__main__':
