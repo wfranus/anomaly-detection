@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def check_trained_model(trained_model):
-    """Check if trained_model is there. otherwise, download"""
+    """Check if trained_model is there. Otherwise, download"""
 
     if os.path.isfile(trained_model):
         logger.info(f"trained_model={trained_model} found. Good to go!")
@@ -58,12 +58,13 @@ def count_frames(path: str, accurate: bool = False) -> Tuple[int, float]:
     Return:
         A tuple (number of frames in video file, frames per second)
     """
+    # FIXME: The real use of opencv here is for quick peering of frame count
+    # FIXME: and FPS. It should not be required to have opencv installed
+    # FIXME: when manual method is chosen by the user.
     video = cv2.VideoCapture(path)
     if not video.isOpened():
         logger.error(f"video={path} can not be opened.")
         sys.exit(-6)
-
-    total = 0
 
     def manual_count(video):
         count = 0
@@ -95,7 +96,7 @@ def count_frames(path: str, accurate: bool = False) -> Tuple[int, float]:
 
 
 def run_C3D_extraction(c3d_root, feature_prototxt: str,
-                       trained_model:str, ofile: str,
+                       trained_model: str, ofile: str,
                        gpu_id: int = 0, batch_size: int = 50,
                        feature_layer: str = 'fc6-1', ) -> int:
     """Extract C3D features by running extract_image_features.bin binary"""
@@ -162,6 +163,8 @@ def create_input_prototxt(input_dir: str,
         stride:      number of frames in a single clip (16 is default for C3D)
         max_clips:   maximum number of clips to be generated from each video.
                      If None, all clips will be used.
+        force_accurate_frames: whether to use slower but always accurate
+                     method for frame counting.
     """
     if not input_files:
         input_files = sorted(os.listdir(input_dir))
@@ -286,7 +289,7 @@ def create_network_prototxt(out_file: str, c3d_root: str, src_file: str,
         f.write(config)
 
 
-def load_array_from_blob(file_path: str, feat_dim: int=4096) -> np.ndarray:
+def load_array_from_blob(file_path: str, feat_dim: int = 4096) -> np.ndarray:
     with open(file_path, 'rb') as f:
         s = array.array("i")
         s.fromfile(f, 5)  # 5 32-bit integers: num, channel, length, height, width
@@ -297,8 +300,8 @@ def load_array_from_blob(file_path: str, feat_dim: int=4096) -> np.ndarray:
     return data
 
 
-def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
-                                   n_seg: int=32, fc: str = 'fc6-1',
+def split_c3d_features_to_segments(feat_dir: str, feat_dim: int = 4096,
+                                   n_seg: int = 32, fc: str = 'fc6-1',
                                    out_dir: str = None,
                                    out_name: str = None,
                                    store_binary: bool = False) \
@@ -336,6 +339,8 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
     for i, file in enumerate(files):
         all_features[i, :] = load_array_from_blob(file, feat_dim)
 
+    # FIXME: breakpoints initialized like this give EXACTLY the same
+    # FIXME: results as MATLAB implementation, but should be refactored
     # breakpoints contains indices of all_features indicating breakpoints
     # for n_seg segments. Breakpoints are computed on 1-based indexing,
     # following matlab implementation of this function.
@@ -358,6 +363,7 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
         else:
             tmp_vec = np.mean(all_features[ss:ee, :], axis=0)
 
+        # apply L2 normalization on the newly created vector
         seg_features[i, :] = tmp_vec/np.linalg.norm(tmp_vec)
 
     if out_dir is not None:
@@ -373,9 +379,20 @@ def split_c3d_features_to_segments(feat_dir: str, feat_dim: int=4096,
     return seg_features
 
 
+def split_features_from_dir(c3d_out_dir, out_mil, n_seg: int = 32) -> None:
+    """Split all C3D features in c3d_out_dir into n_seg segments."""
+    logger.info("Converting extracted features to MIL data format.")
+    feat_dirs = [f.path for f in os.scandir(c3d_out_dir) if f.is_dir()]
+    feat_dirs = sorted(feat_dirs)
+
+    for dir in feat_dirs:
+        split_c3d_features_to_segments(feat_dir=dir, out_dir=out_mil,
+                                       n_seg=n_seg)
+
+
 def prepare_C3D_features(args):
-    """Extracts C3D features from videos and convert these features
-    into desired number of new features to match MIL input data format
+    """Extract C3D features from videos and convert these features
+    into desired number of new features to match MIL input data format.
 
     Args:
         args: namespace or dictionary-like object with arguments
@@ -415,6 +432,7 @@ def prepare_C3D_features(args):
         mean_file=None,
         batch_size=args.batch_size
     )
+    logger.info("Running C3D extractor...")
     ret_code = run_C3D_extraction(
         args.c3d_root,
         feature_prototxt=os.path.join(prototxt_dir, feature_extraction_config),
@@ -424,38 +442,59 @@ def prepare_C3D_features(args):
         batch_size=args.batch_size,
         feature_layer='fc6-1'
     )
-
+    # ret_code = 0
     if ret_code == 0:
         logger.info("Feature extraction completed!")
-        logger.info("Converting extracted features to MIL data format.")
-        feat_dirs = [f.path for f in os.scandir(args.out_c3d) if f.is_dir()]
-        feat_dirs = sorted(feat_dirs)
-
-        for dir in feat_dirs:
-            split_c3d_features_to_segments(feat_dir=dir, out_dir=args.out_mil,
-                                           n_seg=args.num_seg)
+        split_features_from_dir(args.out_c3d, args.out_mil, args.num_seg)
     else:
         logger.error("Feature extraction failed!")
 
 
 def main():
+    """Extract C3D features from videos and convert these features
+    into desired number of new features to match MIL input data format.
+
+    If you have already extracted C3D features and only want to create
+    features for MIL, run with --segment_only flag and pass --out_c3d.
+
+    Before running make sure you have installed C3D model and checked
+    configuration in config.yml.
+    """
     parser = ArgumentParser()
-    parser.add_argument('--num_seg', type=int, default=32)
+    parser.add_argument('--num_seg', type=int, default=32,
+                        help='Number of new features to be created for each '
+                             'video. Must match MIL input data format.')
     parser.add_argument('--fast', action='store_true', default=False,
                         help='If true, try to read frame count from video '
                              'metadata. If false or such information is not '
                              'provided in metadata, count video frames manually '
                              'which always gives accurate result but is slow.')
-    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
-    parser.add_argument('--input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Test.txt')
+    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos',  # noqa
+                        help='Directory with videos.')
+    parser.add_argument('--input_file', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Anomaly_Detection_splits/Anomaly_Test.txt',  # noqa
+                        help='Text file listing paths to videos for which '
+                             'features should be extracted. Paths must be '
+                             'relative to "video_dir".')
     parser.add_argument('--out_c3d', default='data/c3d/test',
-                        help='output directory for C3D features')
+                        help='Output directory for C3D features.')
     parser.add_argument('--out_mil', default='data/mil/test',
-                        help='output directory for MIL model input data '
-                             '(segmented C3D features)')
+                        help='Output directory for MIL model input data '
+                             '(segmented C3D features).')
+    parser.add_argument('--segment_only', action='store_true',
+                        help='If set, skip C3D extraction and only segment '
+                             '3D features. Extracted C3D features must be '
+                             'stored in "out_c3d" directory.')
     args = parser.parse_args()
 
-    # check provided paths and download model if necessary
+    # fast path for segmentation
+    if args.segment_only:
+        if not os.path.isdir(args.out_c3d):
+            logger.error(f'Directory with C3D features doesn\'t exist: {args.video_dir}')
+            sys.exit()
+
+        return split_features_from_dir(args.out_c3d, args.out_mil, args.num_seg)
+
+    # check provided paths
     if not os.path.isdir(args.video_dir):
         logger.error(f'Video directory doesn\'t exist: {args.video_dir}')
         sys.exit()
@@ -476,10 +515,11 @@ def main():
                      batch_size=cfg['C3D']['batch_size'],
                      gpu=cfg['gpu'])
 
+    # check if pretrained model exists and download if necessary
     check_trained_model(args.model)
 
     # run pipeline
-    prepare_C3D_features(args)
+    return prepare_C3D_features(args)
 
 
 if __name__ == '__main__':
