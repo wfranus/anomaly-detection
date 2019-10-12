@@ -1,0 +1,55 @@
+UCF-Anomaly-Detection-Dataset
+
+Waqas Sultani, Chen Chen, Mubarak Shah, "Real-world Anomaly Detection in
+Surveillance Videos" IEEE Conference on Computer Vision and Pattern
+Recognition (CVPR), 2018
+===============================================================================
+
+Total videos:               1900
+Total mp4 files:            1950 (50 duplicated)
+Number of anomalies:        13
+Anomaly videos:             950
+         train:             810
+         test:              140
+Normal videos:              950
+         train:             800
+         test:              150
+
+Directory structure:
+* UCF_Crimes
+ * Action_Regnition_splits
+  - CLassIDs.txt                - contains integer mapping for classes
+  - test_00*.txt                - contains relative paths to test videos for activity recognition task
+  - train_00*.text              - contains relative paths to train videos for activity recognition task
+ * Anomaly_Detection_splits
+  - Anomaly_Test.txt            - contains relative paths to 290 test videos for anomaly detection task
+  - Anomaly_Train.txt           - contains relative paths to 1610 train videos for anomaly_detection task
+ * Videos
+  * Abuse                               50 videos
+  * Arrest                              50 videos
+  * Arson                               50 videos
+  * Assault                             50 videos
+  * Burglary                           100 videos
+  * Explosion                           50 videos
+  * Fighting                            50 videos
+  * RoadAccidents                      150 videos
+  * Robbery                            150 videos
+  * Shooting                            50 videos
+  * Shoplifting                         50 videos
+  * Stealing                           100 videos
+  * Vandalism                           50 videos
+  * Testing_Normal_Videos_Anomaly      150 videos       normal test videos
+  * Training_Normal_Videos_Anomaly     800 videos       normal train videos
+  * Normal_Videos_event                 50 videos       normal videos used during event recognition
+- Temporal_Anomaly_Annotation.txt     - contains temporal annotations for test videos
+
+Each row of 'Temporal_Anomaly_Annotation.txt' is the annotation for a video, for example:
+Abuse028_x264.mp4  Abuse  165  240  -1 -1
+-	The first column is the name of the video
+-	The second column is the name of the anomalous event
+-	The third column is the starting frame of the event (you will have to convert each video to image frames first)
+-	The fourth column is the ending frame of the event.
+-	For videos in which second  instance of event occurs, fifth and sixth contains starting and ending frames of second instance.
+    Negative number means no anomalous event instance. In this example, abuse (instance) only occurs once.
+
+Note: Our videos have 30 frames per second.
