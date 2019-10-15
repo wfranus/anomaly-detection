@@ -32,9 +32,9 @@ def evaluate():
     parser.add_argument('--temp_ann', default='data/Temporal_Anomaly_Annotation.txt')
     parser.add_argument('--c3d_features', default='data/c3d/test',
                         help='directory with C3D features')
-    parser.add_argument('--scores', default='results',
+    parser.add_argument('-s', '--scores', default='results',
                         help='directory with predictions (scores)')
-    parser.add_argument('--out', default='eval_results')
+    parser.add_argument('-o,', '--out', default='eval_results')
     args = parser.parse_args()
 
     # check provided paths

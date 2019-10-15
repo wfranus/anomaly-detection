@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 # np.random.seed(42)
 # from tensorflow import set_random_seed
 # set_random_seed(42)
@@ -10,7 +11,7 @@ from keras.optimizers import Adagrad
 from scipy.io import savemat
 
 from src.model import create_model, save_model
-from src.data_loader import load_video_data
+from src.data_loader import load_all_features_from_dir
 from src.loss import custom_loss
 
 
@@ -36,50 +37,65 @@ if __name__ == '__main__':
                              'with C3D.')
     parser.add_argument('-s', '--save_path', default='pretrained',
                         help='Where to save trained MIL model.')
-    parser.add_argument('data', default='data',
-                        help=('Directory with training data. Must contain '
-                              'two subdirectories "norm" and "abnorm"'))
+    parser.add_argument('data', default='data/mil/train',
+                        help='Directory with training data.')
     args = parser.parse_args()
 
-    abnorm_path = os.path.join(args.data, 'abnorm')
-    norm_path = os.path.join(args.data, 'norm')
-
-    for p in (abnorm_path, norm_path):
-        if not os.path.exists(p):
-            raise FileNotFoundError(p)
-        elif not os.path.isdir(p):
-            raise NotADirectoryError(p)
+    if not os.path.isdir(args.data):
+        raise FileNotFoundError(args.data)
 
     os.makedirs(args.save_path, exist_ok=True)
     model_path = os.path.join(args.save_path, 'model.json')
     weights_path = os.path.join(args.save_path, 'weights.mat')
 
-    mil_model = create_model(input_dim=args.dim_features)
-    optimizer = Adagrad(lr=args.learning_rate, epsilon=1e-08)
-    mil_model.compile(optimizer=optimizer,
-                      loss=custom_loss(n_bags=args.batch_size,
-                                       n_seg=args.segments))
+    sess = tf.Session()
+    with sess.as_default():
+        mil_model = create_model(input_dim=args.dim_features)
+        optimizer = Adagrad(lr=args.learning_rate, epsilon=1e-08)
+        mil_model.compile(optimizer=optimizer,
+                          loss=custom_loss(n_bags=args.batch_size,
+                                           n_seg=args.segments))
 
-    loss_graph = []
-    time_before = datetime.now()
+        loss_graph = []
+        time_before = datetime.now()
 
-    for it in range(args.iterations):
-        inputs, targets = load_video_data(abnorm_path, norm_path,
-                                          batch_size=args.batch_size,
-                                          n_seg=args.segments,
-                                          feat_dim=args.dim_features)
-        batch_loss = mil_model.train_on_batch(inputs, targets)
-        loss_graph = np.hstack((loss_graph, batch_loss))
+        # load all data in advance to speed up training
+        print("Loading all training data..")
+        norm_inputs, abnorm_inputs = load_all_features_from_dir(
+                args.data, n_seg=args.segments, feat_dim=args.dim_features)
+        print("Data loaded. Training started..")
 
-        if it % 20 == 1:
-            print(f'These iteration={it}) took: {datetime.now() - time_before},'
-                  f' with loss of {batch_loss}')
-            iteration_path = os.path.join(args.save_path,
-                                          f'Iterations_graph_{it}.mat')
-            savemat(iteration_path, dict(loss_graph=loss_graph))
-        if it % 1000 == 0:
-            it_weights_path = os.path.join(args.save_path,
-                                           f'weightsAnomalyL1L2_{it}.mat')
-            save_model(mil_model, model_path, it_weights_path)
+        # targets for single batch are always the same
+        targets_size = args.batch_size * args.segments
+        targets = np.array([np.zeros(targets_size//2, dtype='uint8'),
+                            np.ones(targets_size//2, dtype='uint8')]).flatten()
 
-    save_model(mil_model, model_path, weights_path)
+        for it in range(args.iterations):
+            # randomly choose batch examples
+            abnorm_indices = np.random.choice(len(abnorm_inputs),
+                                              args.batch_size//2,
+                                              replace=False)
+            norm_indices = np.random.choice(len(norm_inputs),
+                                            args.batch_size//2,
+                                            replace=False)
+            inputs = np.vstack([abnorm_inputs[abnorm_indices],
+                                norm_inputs[norm_indices]])
+            inputs = inputs.reshape(args.batch_size*args.segments,
+                                    args.dim_features)
+
+            batch_loss = mil_model.train_on_batch(inputs, targets)
+
+            loss_graph = np.hstack((loss_graph, batch_loss))
+
+            if it % 20 == 1:
+                print(f'These iteration={it}) took: {datetime.now() - time_before},'
+                      f' with loss of {batch_loss}')
+                iteration_path = os.path.join(args.save_path,
+                                              f'Iterations_graph_{it}.mat')
+                savemat(iteration_path, dict(loss_graph=loss_graph))
+            if it % 1000 == 0:
+                it_weights_path = os.path.join(args.save_path,
+                                               f'weightsAnomalyL1L2_{it}.mat')
+                save_model(mil_model, model_path, it_weights_path)
+
+        save_model(mil_model, model_path, weights_path)
