@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     os.makedirs(args.save_path, exist_ok=True)
     model_path = os.path.join(args.save_path, 'model.json')
-    weights_path = os.path.join(args.save_path, 'weights.mat')
+    weights_path = os.path.join(args.save_path, 'weights_L1L2.mat')
 
     sess = tf.Session()
     with sess.as_default():

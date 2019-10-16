@@ -53,23 +53,22 @@ def load_all_features_from_dir(features_dir: str, n_seg: int, feat_dim: int = 40
     norm_videos = [f for f in all_files if 'Normal' in f]
     abnorm_videos = [f for f in all_files if f not in norm_videos]
 
-    norm_features = []
-    for i, file in enumerate(norm_videos):
-        abs_path = os.path.join(features_dir, file)
-        norm_features.append(load_features_from_file(abs_path, n_seg, feat_dim))
+    def load_features_from_paths(paths):
+        if not paths:
+            return None
 
-    norm_features = np.stack(norm_features)
+        features = []
+        for i, file in enumerate(paths):
+            abs_path = os.path.join(features_dir, file)
+            loaded_features = load_features_from_file(abs_path, n_seg, feat_dim)
+            features.append(loaded_features)
 
-    abnorm_features = []
-    for i, file in enumerate(abnorm_videos):
-        abs_path = os.path.join(features_dir, file)
-        abnorm_features.append(load_features_from_file(abs_path, n_seg, feat_dim))
+        return np.stack(features)
 
-    abnorm_features = np.stack(abnorm_features)
+    norm_features = load_features_from_paths(norm_videos)
+    abnorm_features = load_features_from_paths(abnorm_videos)
 
-    norm_targets = np.ones(len(norm_videos), dtype='uint8')
-    abnorm_targets = np.zeros(len(abnorm_videos), dtype='uint8')
-    return norm_features, abnorm_features, norm_targets, abnorm_targets
+    return norm_features, abnorm_features
 
 
 def load_features_from_file(file_path: str, n_seg: int, feat_dim: int = 4096) \

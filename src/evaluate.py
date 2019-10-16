@@ -24,17 +24,25 @@ C3D_FPC = 16
 C3D_FC = 'fc6-1'
 # number of segments (instances) used in MIL model
 N_SEG = 32
+# threshold for anomaly score above which predicted class is "anomaly"
+SCORE_THRESH = 0.5
 
 
 def evaluate():
     parser = ArgumentParser()
-    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos')
-    parser.add_argument('--temp_ann', default='data/Temporal_Anomaly_Annotation.txt')
+    parser.add_argument('--video_dir', default='data/UCF-Anomaly-Detection-Dataset/UCF_Crimes/Videos',  # noqa
+                        help='Directory with test videos. Required to compute '
+                             'frame counts for each video.')
+    parser.add_argument('--temp_ann', default='data/Temporal_Anomaly_Annotation.txt',
+                        help='File with temporal annotations of test videos.')
     parser.add_argument('--c3d_features', default='data/c3d/test',
-                        help='directory with C3D features')
+                        help='Directory with C3D features. Needed to count '
+                             'number of generated features for each video '
+                             '(number of files in each subdirectory).')
     parser.add_argument('-s', '--scores', default='results',
-                        help='directory with predictions (scores)')
-    parser.add_argument('-o,', '--out', default='eval_results')
+                        help='Directory with predictions (scores).')
+    parser.add_argument('-o,', '--out', default='eval_results',
+                        help='Where to save evaluation results.')
     args = parser.parse_args()
 
     # check provided paths
@@ -77,7 +85,8 @@ def evaluate():
 
         # count frames used in C3D feature extraction (possibly subset of total)
         c3d_feat_dir = os.path.join(args.c3d_features, video_name)
-        n_c3d_features = len([f for f in os.listdir(c3d_feat_dir) if f.endswith(C3D_FC)])
+        n_c3d_features = len([f for f in os.listdir(c3d_feat_dir)
+                              if f.endswith(C3D_FC)])
         n_frames_c3d = n_c3d_features * C3D_FPC
 
         # load predictions for frames used in C3D feature extraction
@@ -90,7 +99,7 @@ def evaluate():
         # predictions for all video frames
         detection_scores = np.zeros((1, n_frames), dtype='float32')
 
-        # compute breakpoints
+        # assign predictions computed for video segments to each frame.
         breakpoints = np.linspace(0, n_frames_c3d, N_SEG + 1)
         breakpoints = np.floor(breakpoints + 0.5).astype('int').tolist()
 
@@ -109,7 +118,8 @@ def evaluate():
         if n_frames_c3d < n_frames:
             logger.debug(f'n_frames_c3d: {n_frames_c3d}, n_frames: {n_frames}, '
                          f'vid={video_name}')
-            detection_scores[0, n_frames_c3d:n_frames] = detection_scores[0, n_frames_c3d-1]
+            detection_scores[0, n_frames_c3d:n_frames] = \
+                detection_scores[0, n_frames_c3d-1]
 
         # read ground truth labels from annotation file
         # anomaly frames are labeled 1, normal 0
@@ -135,7 +145,7 @@ def evaluate():
         # calculate statistics
         fpr, tpr, thresholds = roc_curve(all_ground_truth, all_predictions)
         roc_auc = auc(fpr, tpr)
-        y_predicted = np.where(all_predictions >= 0.5, 1, 0)
+        y_predicted = np.where(all_predictions >= SCORE_THRESH, 1, 0)
         acc = accuracy_score(all_ground_truth, y_predicted)
         report = classification_report(all_ground_truth, y_predicted,
                                        target_names=['normal', 'anomaly'])
