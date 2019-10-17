@@ -18,6 +18,7 @@ from utils.prepare_C3D_features import count_frames
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# TODO: parametrize or load from config?
 # number of frames in single clip used in C3D feature extraction
 C3D_FPC = 16
 # fully connected layer of C3D net used to get features
@@ -154,7 +155,7 @@ def evaluate():
         normal_predicted = y_predicted[np.where(all_ground_truth == 0)]
         normal_ground_truth = np.zeros_like(normal_predicted)
         cm = confusion_matrix(normal_ground_truth, normal_predicted)
-        FPR_norm = cm[0][1] / normal_predicted.shape[0]
+        FPR_norm = cm[0][1] / normal_predicted.shape[0]  # TODO: in denominator just take total number of normal videos
 
         # create text report
         out_report = [

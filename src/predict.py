@@ -24,9 +24,9 @@ if __name__ == '__main__':
                         help='Dimensionality of video features.')
     parser.add_argument('-r', '--ratio', type=float,
                         help='Randomly choose subset of test videos such that '
-                             'anomaly to normal class ratio is as close to '
-                             'the passed value as possible. By default all '
-                             'videos from data directory are considered.')
+                             'percentage of anomaly videos in chosen subset is '
+                             'nearly equal to given ratio value. By default '
+                             'all videos from data directory are considered.')
     parser.add_argument('data', default='data', help='Test data directory.')
 
     args = parser.parse_args()
@@ -57,6 +57,7 @@ if __name__ == '__main__':
                                            args.segments, args.dim_features)
     abnorm_inputs = load_features_from_files(abnorm_videos, args.data,
                                              args.segments, args.dim_features)
+    # TODO: refactor
     if (norm_inputs is not None) and (abnorm_inputs is not None):
         inputs = np.vstack([norm_inputs, abnorm_inputs])
     elif norm_inputs is not None:
@@ -72,4 +73,4 @@ if __name__ == '__main__':
         print(f'Predicting anomaly scores for: {tp}...')
         y_pred = mil_model.predict_on_batch(inputs[i])  # anomaly score for each seg.
         out_path = os.path.join(args.output_path, f'{test_files[i][:-4]}.mat')
-        savemat(out_path, dict(y_pred=y_pred))
+        savemat(out_path, dict(y_pred=y_pred))  # TODO: matlab really?

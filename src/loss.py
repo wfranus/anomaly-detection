@@ -26,6 +26,7 @@ def custom_loss(n_bags: int, n_seg: int,
         print(f'y_true shape: {K.int_shape(y_true)}')
         print(f'y_pred shape: {K.int_shape(y_pred)}')
 
+        # TODO: we can take label of first segment as each is the same for single video
         sum_labels = K.sum(y_true, axis=-1)  # sum of labels for each bag
         max_scores = K.max(y_pred, axis=-1)  # max scores for each bag
         print(f'sum_labels shape: {K.int_shape(sum_labels)}')
@@ -40,6 +41,7 @@ def custom_loss(n_bags: int, n_seg: int,
         print(f'abnorm_max_scores shape: {K.int_shape(abnorm_max_scores)}')
         print(f'norm_max_scores shape: {K.int_shape(norm_max_scores)}')
 
+        # TODO: WTF?
         # hinge loss pushes scores for abnormal and normal segments far apart
         # i.e. it maximizes difference between abnormal and normal scores
         def partial_loss(norm_max_score):
