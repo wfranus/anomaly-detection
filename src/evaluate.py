@@ -68,7 +68,7 @@ def evaluate():
                               names=['name', 'class', 'sf1', 'ef1', 'sf2', 'ef2'])
 
     # predictions (scores) and ground truth for all frames from all videos
-    all_predictions, all_ground_truth = None, None
+    y_frame_scores, y_frame_true = None, None
 
     for i, pred_file in enumerate(pred_file_paths):
         # name of the sample video without extension
@@ -133,35 +133,39 @@ def evaluate():
             ground_truth[0, sf2:ef2] = 1
 
         if i == 0:
-            all_predictions = detection_scores
-            all_ground_truth = ground_truth
+            y_frame_scores = detection_scores
+            y_frame_true = ground_truth
         else:
-            all_predictions = np.hstack((all_predictions, detection_scores))
-            all_ground_truth = np.hstack((all_ground_truth, ground_truth))
+            y_frame_scores = np.hstack((y_frame_scores, detection_scores))
+            y_frame_true = np.hstack((y_frame_true, ground_truth))
 
-    if all_predictions is not None and all_ground_truth is not None:
-        all_predictions = all_predictions.transpose()
-        all_ground_truth = all_ground_truth.transpose()
+        assert y_frame_scores.shape == y_frame_true.shape
+
+    if y_frame_scores is not None and y_frame_true is not None:
+        y_frame_scores = y_frame_scores.transpose()
+        y_frame_true = y_frame_true.transpose()
 
         # calculate statistics
-        fpr, tpr, thresholds = roc_curve(all_ground_truth, all_predictions)
+        fpr, tpr, thresholds = roc_curve(y_frame_true, y_frame_scores)
         roc_auc = auc(fpr, tpr)
-        y_predicted = np.where(all_predictions >= SCORE_THRESH, 1, 0)
-        acc = accuracy_score(all_ground_truth, y_predicted)
-        report = classification_report(all_ground_truth, y_predicted,
+
+        y_frame_pred = np.where(y_frame_scores >= SCORE_THRESH, 1, 0)
+        acc = accuracy_score(y_frame_true, y_frame_pred)
+        report = classification_report(y_frame_true, y_frame_pred,
                                        target_names=['normal', 'anomaly'])
 
-        # calculate false positive rate for normal videos' frames
-        normal_predicted = y_predicted[np.where(all_ground_truth == 0)]
-        normal_ground_truth = np.zeros_like(normal_predicted)
-        cm = confusion_matrix(normal_ground_truth, normal_predicted)
-        FPR_norm = cm[0][1] / normal_predicted.shape[0]  # TODO: in denominator just take total number of normal videos
+        # calculate stats for selected SCORE_THRESH
+        tn, fp, fn, tp = confusion_matrix(y_frame_true, y_frame_pred).ravel()
+        FPR = fp / (fp + tn)
+        TPR = tp / (tp + fn)
 
         # create text report
         out_report = [
+            f"FPR: {FPR:.3f}",
+            f"TPR: {TPR:.3f}",
+            f"AUC: {roc_auc:.4f}",
             f"Accuracy: {acc:.3f}",
-            f"FPR for normal videos: {FPR_norm:.3f}",
-            f"AUC: {roc_auc:.4f}\n",
+            f"TN: {tn}, FP: {fp}, FN: {fn}, TP: {tp}\n",
             report
         ]
         os.makedirs(args.out, exist_ok=True)
