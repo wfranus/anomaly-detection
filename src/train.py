@@ -11,7 +11,7 @@ from keras.optimizers import Adagrad
 from scipy.io import savemat
 
 from src.model import create_model, save_model
-from src.data_loader import load_all_features_from_dir
+from src.data_loader import load_features_from_dir
 from src.loss import custom_loss
 
 
@@ -56,20 +56,23 @@ if __name__ == '__main__':
                           loss=custom_loss(n_bags=args.batch_size,
                                            n_seg=args.segments))
 
-        loss_graph = []
-        time_before = datetime.now()
-
         # load all data in advance to speed up training
         print("Loading all training data..")
-        norm_inputs, abnorm_inputs = load_all_features_from_dir(
+        norm_inputs, abnorm_inputs = load_features_from_dir(
                 args.data, n_seg=args.segments, feat_dim=args.dim_features)
         print("Data loaded. Training started..")
 
-        # targets for single batch are always the same
+        # Segments of anomaly video are labeled 1
+        # segments of normal video are labeled 0.
+        # Here, 1s and 0s are stacked in this order to match order
+        # of stacked inputs before shuffling (see loop below).
         targets_size = args.batch_size * args.segments
-        targets = np.array([np.zeros(targets_size//2, dtype='uint8'),
-                            np.ones(targets_size//2, dtype='uint8')]).flatten()
+        targets = np.array([np.ones(targets_size//2, dtype='uint8'),
+                            np.zeros(targets_size//2, dtype='uint8')])
+        targets = targets.reshape((args.batch_size, args.segments))
 
+        loss_graph = []
+        time_before = datetime.now()
         for it in range(args.iterations):
             # randomly choose batch examples
             abnorm_indices = np.random.choice(len(abnorm_inputs),
@@ -78,13 +81,25 @@ if __name__ == '__main__':
             norm_indices = np.random.choice(len(norm_inputs),
                                             args.batch_size//2,
                                             replace=False)
-            inputs = np.vstack([abnorm_inputs[abnorm_indices],
-                                norm_inputs[norm_indices]])
-            inputs = inputs.reshape(args.batch_size*args.segments,
-                                    args.dim_features)
+            # stacked array has 3 dims (batch_size, segments, dim_features)
+            batch_inputs = np.vstack([abnorm_inputs[abnorm_indices],
+                                      norm_inputs[norm_indices]])
 
-            batch_loss = mil_model.train_on_batch(inputs, targets)
+            # shuffle inputs over 1st dim (shuffle videos in batch);
+            # note: segments of single video CANNOT be shuffled (because of
+            # temporal smoothness term in loss function).
+            permuted_indices = np.random.permutation(args.batch_size)
+            batch_inputs = batch_inputs[permuted_indices]
+            batch_targets = targets[permuted_indices]
 
+            # reshape inputs to 2D and targets to 1D
+            batch_inputs = batch_inputs.reshape((args.batch_size*args.segments,
+                                                 args.dim_features))
+            batch_targets = batch_targets.flatten()
+
+            batch_loss = mil_model.train_on_batch(batch_inputs, batch_targets)
+
+            # TODO: use keras to keep track of loss
             loss_graph = np.hstack((loss_graph, batch_loss))
 
             if it % 20 == 1:
