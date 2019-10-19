@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # simulate anomaly to normal class ratio given by user,
     # maximizing total test set size at the same time
-    if args.ratio:
+    if args.ratio is not None:
         print(f'Balancing data to the class ratio defined by user: {args.ratio}')
         print(f'Randomly chosen anomaly videos: {len(abnorm_videos)}')
         print(f'Randomly chosen normal videos: {len(norm_videos)}')
