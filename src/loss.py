@@ -15,6 +15,9 @@ def custom_loss(n_bags: int, n_seg: int,
     Returns:
         An actual loss function
     """
+    NORM_LABEL = 0
+    ABNORM_LABEL = 1
+
     def mil_loss_with_constrains(y_true, y_pred):
         """
         MIL loss function with additional constraints for scores of
@@ -23,25 +26,18 @@ def custom_loss(n_bags: int, n_seg: int,
         # input predictions and labels are 1D, we want 2D
         y_true = K.reshape(y_true, shape=(n_bags, n_seg))
         y_pred = K.reshape(y_pred, shape=(n_bags, n_seg))
-        print(f'y_true shape: {K.int_shape(y_true)}')
-        print(f'y_pred shape: {K.int_shape(y_pred)}')
 
-        # TODO: we can take label of first segment as each is the same for single video
-        sum_labels = K.sum(y_true, axis=-1)  # sum of labels for each bag
-        max_scores = K.max(y_pred, axis=-1)  # max scores for each bag
-        print(f'sum_labels shape: {K.int_shape(sum_labels)}')
-        print(f'max_scores shape: {K.int_shape(max_scores)}')
+        # bag-level labels are the same as labels of each instance (video segment)
+        y_true_bag = y_true[:, 0]
 
-        # labels of normal segments sum up to n_seg (see data_loader.py)
-        # while labels of abnormal segments sum up to 0
-        abnorm_mask = K.equal(sum_labels, 0)
-        norm_mask = K.equal(sum_labels, n_seg)
+        # max score in each bag is taken as bag-level prediction
+        # for hinge loss computation
+        max_scores = K.max(y_pred, axis=-1)
+        abnorm_mask = K.equal(y_true_bag, ABNORM_LABEL)
+        norm_mask = K.equal(y_true_bag, NORM_LABEL)
         abnorm_max_scores = tf.boolean_mask(max_scores, abnorm_mask)
         norm_max_scores = tf.boolean_mask(max_scores, norm_mask)
-        print(f'abnorm_max_scores shape: {K.int_shape(abnorm_max_scores)}')
-        print(f'norm_max_scores shape: {K.int_shape(norm_max_scores)}')
 
-        # TODO: WTF?
         # hinge loss pushes scores for abnormal and normal segments far apart
         # i.e. it maximizes difference between abnormal and normal scores
         def partial_loss(norm_max_score):
@@ -57,8 +53,8 @@ def custom_loss(n_bags: int, n_seg: int,
         # temporal smoothness constraint (L2) applied to abnormal bags only
         tmp_score_diff = abnorm_pred[:, :n_seg - 1] - abnorm_pred[:, 1:]
         smooth_term = K.sum(K.pow(tmp_score_diff, 2))
-        print(f'smooth_term shape: {K.int_shape(smooth_term)}')
-        print(f'sparsity_term shape: {K.int_shape(sparsity_term)}')
+        # print(f'smooth_term shape: {K.int_shape(smooth_term)}')
+        # print(f'sparsity_term shape: {K.int_shape(sparsity_term)}')
 
         loss = hinge_loss + coef1 * smooth_term + coef2 * sparsity_term
         return loss
