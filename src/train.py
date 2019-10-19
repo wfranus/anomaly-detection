@@ -8,7 +8,7 @@ import os
 from argparse import ArgumentParser
 from datetime import datetime
 from keras.optimizers import Adagrad
-from scipy.io import savemat
+from tensorflow.summary import FileWriter
 
 from src.model import create_model, save_model
 from src.data_loader import load_features_from_dir
@@ -47,6 +47,11 @@ if __name__ == '__main__':
     os.makedirs(args.save_path, exist_ok=True)
     model_path = os.path.join(args.save_path, 'model.json')
     weights_path = os.path.join(args.save_path, 'weights_L1L2.mat')
+
+    # create file writer to save logs after each iteration
+    file_writer = FileWriter(os.path.join(args.save_path, 'logs'),
+                             max_queue=1000,
+                             flush_secs=10)
 
     sess = tf.Session()
     with sess.as_default():
@@ -99,15 +104,14 @@ if __name__ == '__main__':
 
             batch_loss = mil_model.train_on_batch(batch_inputs, batch_targets)
 
-            # TODO: use keras to keep track of loss
-            loss_graph = np.hstack((loss_graph, batch_loss))
+            # save loss in logs
+            summary = tf.Summary(value=[tf.Summary.Value(tag="loss",
+                                                         simple_value=batch_loss)])
+            file_writer.add_summary(summary)
 
             if it % 20 == 1:
                 print(f'These iteration={it}) took: {datetime.now() - time_before},'
                       f' with loss of {batch_loss}')
-                iteration_path = os.path.join(args.save_path,
-                                              f'Iterations_graph_{it}.mat')
-                savemat(iteration_path, dict(loss_graph=loss_graph))
             if it % 1000 == 0:
                 it_weights_path = os.path.join(args.save_path,
                                                f'weightsAnomalyL1L2_{it}.mat')
