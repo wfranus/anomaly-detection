@@ -1,5 +1,5 @@
 # anomaly-detection
-Anomaly detection using deep multiple instance learning (MIL)
+Anomaly detection in surveillance videos using deep multiple instance learning (MIL)
 
 ## Requirements
 * Python 3.6+
