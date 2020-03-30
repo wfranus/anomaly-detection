@@ -1,10 +1,18 @@
 # anomaly-detection
-Anomaly detection in surveillance videos using deep multiple instance learning (MIL)
+Anomaly detection in surveillance videos using deep multiple instance learning (MIL).
+
+This is an implementation of [this paper](http://openaccess.thecvf.com/content_cvpr_2018/papers/Sultani_Real-World_Anomaly_Detection_CVPR_2018_paper.pdf):
+```
+Real-world Anomaly Detection in Surveillance Videos
+Sultani, Waqas and Chen, Chen and Shah, Mubarak,
+The IEEE Conference on Computer Vision and Pattern Recognition (CVPR), June 2018
+```
+This repo is an updated, refactored version of the [original implementation](https://github.com/WaqasSultani/AnomalyDetectionCVPR2018), rewritten in Python3 only (original code was in Matlab and Python2).
 
 ## Requirements
 * Python 3.6+
 * C3D v1.0
-* Keras 2.2.4 with Tensorflow 1.9.0 backend
+* Keras 2.2.4 with Tensorflow 1.9.0 backend (tested on these versions only)
 
 ## Installation
 Follow instructions in `INSTALL.md` to install C3D and its dependencies.
